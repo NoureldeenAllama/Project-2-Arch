@@ -1,0 +1,49 @@
+									Project 2									
+								     Student Journal
+
+
+Student Names:
+
+Mohamed waleed elshemy (900193930)
+
+Noureldeen Amr Allama  (900202115)
+
+
+
+
+Thursday 7/12/23: Reviewed the project requirements and chose the prefered language of programming (Python). Journal Inception.
+
+
+
+
+Friday 8/12/23: Started working on the project, changed the language (C++), reviewed the RISC V simulator code, and divided the work into: 
+
+(1 & 2): 
+
+Load/Store & BNE
+ 
+(3 & 4):
+
+Call/Return & Arithmetic and Logic operations
+
+
+
+Saturday 9/12/23: Started working on building structures for ROB, reservations stations, and multiple functional units. Reviewed some of the divided work so far on supporting instructions. Tomasulo processor simulation.
+
+
+
+
+Sunday 10/12/23: Worked on the result simulation for the Tomasulo processor.
+
+
+
+
+Monday 11/12/23: Finished working on reservation stations, functional units, and fixed some issues with the clock and the memory.
+
+
+
+
+Tuesday 12/12/23: Fixed more issues, and finalized the cases for Tomasulo with the designed test programs. Journal end.
+
+
+

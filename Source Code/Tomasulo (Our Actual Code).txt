@@ -1,0 +1,403 @@
+#include <iostream>
+#include <vector>
+#include <unordered_map>
+#include <iomanip>
+
+using namespace std;
+
+enum class OpType {load,store,BNE,ADD,ADDI,NAND,DIV,CALL,RET};
+
+struct Instruction {
+
+    OpType op;
+
+    int rs; 
+
+    int rt; 
+
+    int rd; 
+
+    int imm;
+
+    Instruction(OpType _op, int _rs, int _rt, int _rd, int _imm)
+
+        : op(_op), rs(_rs), rt(_rt), rd(_rd), imm(_imm) {}
+};
+
+struct RS{
+
+    OpType op;
+
+    int Vj; 
+
+    int Vk;
+
+    int Qj; 
+
+    int Qk;
+
+    int Dest;
+
+    int Addrs;
+
+    bool busy;
+
+    int cycles;
+
+    RS() : busy(false), cycles(0) {}
+};
+
+class Tomasulo {
+
+public:
+
+    Tomasulo(const vector<Instruction>& program, const vector<pair<int, int>>& data);
+
+    void simulate();
+
+private:
+
+vector<Instruction> program;
+
+    vector<RS> reservation_stations;
+
+    unordered_map<int, int> memory;
+
+    vector<int> regs;
+
+    vector<int> tags;
+
+    int pc;
+
+    int clock_cycles;
+
+    int branch_miss;
+
+
+
+    void issue(const Instruction& instruction);
+
+    void execute();
+
+    void execute_instruction(RS& rs);
+
+    void write();
+
+    void metrics();
+
+    void res_st_out();
+
+};
+
+Tomasulo::Tomasulo(const vector<Instruction>& program, const vector<pair<int, int>>& data)
+
+    : pc(0), clock_cycles(0), branch_miss(0) {
+    
+    for (const auto& item : data) {
+
+        memory[item.first] = item.second;
+    }
+
+    
+    regs.resize(8, 0);
+
+    tags.resize(8, -1);
+
+   
+    for (const auto& instr : program) {
+
+        issue(instr);
+    }
+					}
+
+void Tomasulo::issue(const Instruction& instruction) {
+
+    RS new_rs;
+
+    new_rs.op = instruction.op;
+
+    new_rs.Dest = instruction.rd;
+
+    new_rs.busy = true;
+
+    switch (instruction.op) {
+
+        case OpType::load:
+
+        case OpType::store:
+
+            new_rs.Vj = regs[instruction.rs];
+            new_rs.Qj = tags[instruction.rs];
+            new_rs.Vk = instruction.imm;
+            new_rs.Qk = -1;
+            new_rs.cycles = 3; 
+
+            break;
+
+        case OpType::BNE:
+
+            new_rs.Vj = regs[instruction.rs];
+            new_rs.Qj = tags[instruction.rs];
+            new_rs.Vk = regs[instruction.rt];
+            new_rs.Qk = tags[instruction.rt];
+            new_rs.Addrs = instruction.imm;
+            new_rs.cycles = 1; 
+
+            break;
+
+        case OpType::ADD:
+        case OpType::ADDI:
+        case OpType::NAND:
+        case OpType::DIV:
+
+            new_rs.Vj = regs[instruction.rs];
+            new_rs.Qj = tags[instruction.rs];
+            new_rs.Vk = regs[instruction.rt];
+            new_rs.Qk = tags[instruction.rt];
+            new_rs.cycles = 2; 
+
+            break;
+
+        case OpType::CALL:
+
+            new_rs.Vj = pc + 1; // PC+1
+            new_rs.Qj = -1;
+            new_rs.cycles = 1; 
+
+            break;
+
+        case OpType::RET:
+
+            new_rs.Vj = regs[1]; 
+            new_rs.Qj = tags[1];
+            new_rs.cycles = 1; 
+
+            break;
+        
+    }
+
+    reservation_stations.push_back(new_rs);
+
+		}
+
+void Tomasulo::execute() {
+
+    for (auto& rs : reservation_stations) {
+
+        if (!rs.busy) continue;
+
+        if (rs.cycles > 0) 
+{
+
+            rs.cycles--;
+        }
+
+        if (rs.cycles == 0) 
+{
+
+            execute_instruction(rs);
+
+      		  }
+   		 }
+		}
+
+void Tomasulo::execute_instruction(RS& rs) {
+
+    switch (rs.op) {
+
+        case OpType::load:
+
+            if (rs.Vj + rs.Vk >= 0 && rs.Vj + rs.Vk < static_cast<int>(memory.size())) {
+
+                rs.Vj = memory[rs.Vj + rs.Vk];
+
+            } 
+
+else {
+
+                
+            }
+
+            break;
+
+        case OpType::store:
+
+            if (rs.Vj + rs.Vk >= 0 && rs.Vj + rs.Vk < static_cast<int>(memory.size())) {
+
+                memory[rs.Vj + rs.Vk] = regs[rs.Dest];
+
+            } 
+
+else {
+               
+            }
+
+            break;
+
+        case OpType::BNE:
+            if (rs.Vj != rs.Vk) {
+                pc = rs.Addrs - 1; 
+                branch_miss++;
+            }
+
+            break;
+
+        case OpType::ADD:
+
+        case OpType::ADDI:
+
+            rs.Vj = rs.Vj + rs.Vk;
+
+            break;
+
+        case OpType::NAND:
+
+            rs.Vj = ~(rs.Vj & rs.Vk);
+
+            break;
+
+        case OpType::DIV:
+
+            if (rs.Vk != 0) {
+
+                rs.Vj = rs.Vj / rs.Vk;
+
+            } 
+
+else {
+                
+            }
+
+            break;
+
+        case OpType::CALL:
+           
+            pc = rs.Vj - 1; 
+
+            break;
+
+        case OpType::RET:
+            
+            pc = rs.Vj - 1; 
+
+            break;
+        
+    }
+
+    write();
+}
+
+void Tomasulo::write() {
+
+    for (auto& rs : reservation_stations) {
+
+        if (!rs.busy || rs.cycles > 0) continue;
+
+        if (rs.Qj == -1 || (rs.Qj != -1 && !reservation_stations[rs.Qj].busy)) {
+
+        if (rs.Qk == -1 || (rs.Qk != -1 && !reservation_stations[rs.Qk].busy)) {
+
+                regs[rs.Dest] = rs.Vj;
+
+                tags[rs.Dest] = -1;
+
+                rs.busy = false;
+            }
+    		    }
+   	 }
+
+    clock_cycles++;
+}
+
+void Tomasulo::simulate() {
+
+    while (pc < program.size() || !reservation_stations.empty()) {
+
+        res_st_out();
+
+        execute();
+
+        if (pc < program.size()) {
+
+            issue(program[pc]);
+
+            pc++;
+        }
+
+        clock_cycles++;
+    }
+
+    metrics();
+		}
+
+
+void Tomasulo::metrics() {
+
+    cout << "clock cycles: " << clock_cycles << endl;
+
+    cout << "branch miss: " << branch_miss << endl;
+}
+void Tomasulo::res_st_out() {
+
+    cout << left << setw(15) << "reservation" << setw(15) << "Op" << setw(15) << "Busy" << setw(15) << "Vj" << setw(15)<< "Vk" << setw(15) << "Qj" << setw(15) << "Qk" << setw(15)            << "Dest" << setw(15) << "Addrs" << setw(15)
+
+         << "cycles" << endl;
+
+    for (const auto& rs : reservation_stations) {
+
+        cout << setw(15) << "station";
+
+        cout << setw(15) << static_cast<int>(rs.op);
+
+        cout << setw(15) << (rs.busy ? "Y" : "N");
+
+        cout << setw(15) << rs.Vj;
+
+        cout << setw(15) << rs.Vk;
+
+        cout << setw(15) << rs.Qj;
+
+        cout << setw(15) << rs.Qk;
+
+        cout << setw(15) << rs.Dest;
+
+        cout << setw(15) << rs.Addrs;
+
+        cout << setw(15) << rs.cycles << endl;
+    }
+}
+
+int main() {
+    
+    vector<Instruction> program = {
+
+        {OpType::load, 1, -1, 2, 100},
+
+        {OpType::ADDI, 2, 3, 4, -1},
+
+        {OpType::BNE, 4, 5, -1, 10},
+
+        {OpType::store, 4, -1, 200, 50},
+
+        {OpType::DIV, 2, 1, 3, -1},
+
+        {OpType::CALL, -1, -1, 1, -1},
+
+        {OpType::ADD, 3, 4, 5, -1},
+
+        {OpType::RET, -1, -1, -1, -1},
+    };
+
+    vector<pair<int, int>> data = {
+
+        {100, 42},
+
+        {200, 56},
+    };
+
+    Tomasulo processor(program, data);
+
+    processor.simulate();
+
+    return 0;
+}
